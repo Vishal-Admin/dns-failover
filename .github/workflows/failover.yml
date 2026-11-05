@@ -1,0 +1,21 @@
+name: DNS failover
+on:
+  schedule:
+    - cron: "*/5 * * * *"      # GitHub minimum is 5 min; runs may start a few min late
+  workflow_dispatch: {}          # manual "Run workflow" button
+concurrency: dns-failover
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run failover check
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          RECORD_NAMES: vmkpi-mis.in   # www is a CNAME to this, so it follows automatically
+          PRIMARY_IP: 14.139.121.234
+          BACKUP_IP: 27.111.73.30
+          CHECK_HOST: www.vmkpi-mis.in
+        run: python3 failover.py
