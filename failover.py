@@ -20,6 +20,7 @@ HOST = os.environ.get("CHECK_HOST", "www.vmkpi-mis.in")
 PATH = os.environ.get("CHECK_PATH", "/")
 TTL = 60
 TRIES, GAP = 3, 10  # 3 attempts, 10s apart, before an IP is called down
+ERR = {}            # last error per IP, shown in GitHub annotations
 
 
 def healthy(ip):
@@ -35,8 +36,10 @@ def healthy(ip):
                     code = int(line.split()[1])
                     if code < 500:
                         return True
+                    ERR[ip] = f"HTTP {code}"
                     print(f"  {ip}: HTTP {code}")
         except Exception as e:
+            ERR[ip] = f"{type(e).__name__}: {e}"
             print(f"  {ip}: attempt {i+1} failed: {e}")
         if i < TRIES - 1:
             time.sleep(GAP)
@@ -79,6 +82,8 @@ def main():
     print(f"Checking primary {PRIMARY} ...")
     p_ok = healthy(PRIMARY)
     print(f"  primary: {'UP' if p_ok else 'DOWN'}")
+    if not p_ok:
+        print(f"::warning::primary {PRIMARY} DOWN from GitHub runner: {ERR.get(PRIMARY)}")
     b_ok = None
     if not p_ok or check_only:
         print(f"Checking backup {BACKUP} ...")
@@ -91,7 +96,7 @@ def main():
     elif b_ok:
         target = BACKUP
     else:
-        print("BOTH links DOWN - leaving DNS unchanged.")
+        print(f"::error::BOTH links DOWN from GitHub runner - DNS unchanged. primary={ERR.get(PRIMARY)} backup={ERR.get(BACKUP)}")
         return 1
     print(f"Target IP: {target}")
     for name in [n.strip() for n in os.environ["RECORD_NAMES"].split(",") if n.strip()]:
@@ -100,4 +105,13 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except SystemExit as e:
+        if isinstance(e.code, str):
+            print("::error::" + e.code)
+            sys.exit(1)
+        raise
+    except Exception as e:
+        print(f"::error::{type(e).__name__}: {e}")
+        sys.exit(1)
