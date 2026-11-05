@@ -69,12 +69,16 @@ def set_record(zone, name, ip, dry):
     if dry:
         return
     body = {"type": "A", "name": name, "content": ip, "ttl": TTL, "proxied": False}
-    if recs:
-        cf("PUT", f"/zones/{zone}/dns_records/{recs[0]['id']}", body)
-        for extra in recs[1:]:
+    # keep the record that already holds the target IP (if any), delete the others FIRST
+    # (Cloudflare refuses to create/update a duplicate of an existing identical record)
+    keep = next((r for r in recs if r["content"] == ip), recs[0] if recs else None)
+    for extra in recs:
+        if keep is None or extra["id"] != keep["id"]:
             cf("DELETE", f"/zones/{zone}/dns_records/{extra['id']}")
-    else:
+    if keep is None:
         cf("POST", f"/zones/{zone}/dns_records", body)
+    else:
+        cf("PUT", f"/zones/{zone}/dns_records/{keep['id']}", body)
 
 
 def main():
