@@ -1,7 +1,7 @@
 name: DNS failover
 on:
   schedule:
-    - cron: "*/5 * * * *"      # GitHub minimum is 5 min; runs may start a few min late
+    - cron: "3-58/5 * * * *"      # every 5 min at :03,:08,... (off the busy :00/:05 slots GitHub often skips)
   workflow_dispatch: {}          # manual "Run workflow" button
 concurrency: dns-failover
 jobs:
